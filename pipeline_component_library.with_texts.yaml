@@ -3659,8 +3659,8 @@ folders:
             - {outputPath: model}
             - --model-config
             - {outputPath: model_config}
-    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/96a177dd71d54c98573c4101d9a05ac801f1fa54/components/XGBoost/Predict/component.yaml
-      digest: 6fd7196d2061e6f49ec98459c90f4b1e4e63bca21170c70b23f7679921ce01d7
+    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/79d79efc5619692b28bcf14d37718077330ad617/components/XGBoost/Predict/component.yaml
+      digest: 86c68f66374a6cb0d0952fdd546fac65f750c9d1ed2578d9cb9094541bda9786
       text: |
         name: Xgboost predict on CSV
         description: Makes predictions using a trained XGBoost model.
@@ -3671,8 +3671,9 @@ folders:
         - {name: model, type: XGBoostModel, description: Trained model in binary XGBoost format.}
         - {name: label_column_name, type: String, description: Optional. Name of the column
             containing the label data that is excluded during the prediction., optional: true}
+        - {name: prediction_column_name, type: String, default: prediction, optional: true}
         outputs:
-        - {name: predictions, description: Model predictions.}
+        - {name: predictions, type: CSV, description: Model predictions.}
         implementation:
           container:
             image: python:3.10
@@ -3680,9 +3681,9 @@ folders:
             - sh
             - -c
             - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
-              'xgboost==1.6.1' 'pandas==1.4.3' 'numpy<2' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3
-              -m pip install --quiet --no-warn-script-location 'xgboost==1.6.1' 'pandas==1.4.3' 'numpy<2'
-              --user) && "$0" "$@"
+              'xgboost==1.6.1' 'pandas==1.4.3' 'numpy<2' || PIP_DISABLE_PIP_VERSION_CHECK=1
+              python3 -m pip install --quiet --no-warn-script-location 'xgboost==1.6.1' 'pandas==1.4.3'
+              'numpy<2' --user) && "$0" "$@"
             - sh
             - -ec
             - |
@@ -3692,6 +3693,7 @@ folders:
             - |
               def _make_parent_dirs_and_return_path(file_path: str):
                   import os
+
                   os.makedirs(os.path.dirname(file_path), exist_ok=True)
                   return file_path
 
@@ -3700,6 +3702,7 @@ folders:
                   model_path,
                   predictions_path,
                   label_column_name = None,
+                  prediction_column_name = "prediction",
               ):
                   """Makes predictions using a trained XGBoost model.
 
@@ -3737,10 +3740,12 @@ folders:
                   df.info(verbose=True)
 
                   if label_column_name is not None:
-                      df = df.drop(columns=[label_column_name])
+                      features_df = df.drop(columns=[label_column_name])
+                  else:
+                      features_df = df
 
                   testing_data = xgboost.DMatrix(
-                      data=df,
+                      data=features_df,
                       enable_categorical=True,
                   )
 
@@ -3748,14 +3753,17 @@ folders:
 
                   predictions = model.predict(testing_data)
 
+                  df[prediction_column_name] = predictions
+
                   Path(predictions_path).parent.mkdir(parents=True, exist_ok=True)
-                  numpy.savetxt(predictions_path, predictions)
+                  df.to_csv(predictions_path, index=False)
 
               import argparse
               _parser = argparse.ArgumentParser(prog='Xgboost predict on CSV', description='Makes predictions using a trained XGBoost model.')
               _parser.add_argument("--data", dest="data_path", type=str, required=True, default=argparse.SUPPRESS)
               _parser.add_argument("--model", dest="model_path", type=str, required=True, default=argparse.SUPPRESS)
               _parser.add_argument("--label-column-name", dest="label_column_name", type=str, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--prediction-column-name", dest="prediction_column_name", type=str, required=False, default=argparse.SUPPRESS)
               _parser.add_argument("--predictions", dest="predictions_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
               _parsed_args = vars(_parser.parse_args())
 
@@ -3770,6 +3778,11 @@ folders:
                 then:
                 - --label-column-name
                 - {inputValue: label_column_name}
+            - if:
+                cond: {isPresent: prediction_column_name}
+                then:
+                - --prediction-column-name
+                - {inputValue: prediction_column_name}
             - --predictions
             - {outputPath: predictions}
     - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/96a177dd71d54c98573c4101d9a05ac801f1fa54/components/XGBoost/Train/from_ApacheParquet/component.yaml
@@ -4016,8 +4029,8 @@ folders:
             - {outputPath: model}
             - --model-config
             - {outputPath: model_config}
-    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/96a177dd71d54c98573c4101d9a05ac801f1fa54/components/XGBoost/Predict/from_ApacheParquet/component.yaml
-      digest: 012fca583d79e22d2121f00251b52e2632052de8bc3d8a6666e881e18fb3ee59
+    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/79d79efc5619692b28bcf14d37718077330ad617/components/XGBoost/Predict/from_ApacheParquet/component.yaml
+      digest: 154892b1c81c3e401e73fe9c5bd2b79e841daf8289058c9ec986dcfd0267e6e7
       text: |
         name: Xgboost predict on ApacheParquet
         description: Makes predictions using a trained XGBoost model.
@@ -4028,8 +4041,9 @@ folders:
         - {name: model, type: XGBoostModel, description: Trained model in binary XGBoost format.}
         - {name: label_column_name, type: String, description: Optional. Name of the column
             containing the label data that is excluded during the prediction., optional: true}
+        - {name: prediction_column_name, type: String, default: prediction, optional: true}
         outputs:
-        - {name: predictions, description: Model predictions.}
+        - {name: predictions, type: ApacheParquet, description: Model predictions.}
         implementation:
           container:
             image: python:3.10
@@ -4038,8 +4052,8 @@ folders:
             - -c
             - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
               'xgboost==1.6.1' 'pandas==1.4.3' 'pyarrow==9.0.0' 'numpy<2' || PIP_DISABLE_PIP_VERSION_CHECK=1
-              python3 -m pip install --quiet --no-warn-script-location 'xgboost==1.6.1' 'pandas==1.4.3' 'numpy<2'
-              'pyarrow==9.0.0' --user) && "$0" "$@"
+              python3 -m pip install --quiet --no-warn-script-location 'xgboost==1.6.1' 'pandas==1.4.3'
+              'pyarrow==9.0.0' 'numpy<2' --user) && "$0" "$@"
             - sh
             - -ec
             - |
@@ -4049,6 +4063,7 @@ folders:
             - |
               def _make_parent_dirs_and_return_path(file_path: str):
                   import os
+
                   os.makedirs(os.path.dirname(file_path), exist_ok=True)
                   return file_path
 
@@ -4057,6 +4072,7 @@ folders:
                   model_path,
                   predictions_path,
                   label_column_name = None,
+                  prediction_column_name = "prediction",
               ):
                   """Makes predictions using a trained XGBoost model.
 
@@ -4092,11 +4108,13 @@ folders:
                   print("Final evaluation data information:")
                   df.info(verbose=True)
 
-                  if label_column_name:
-                      df = df.drop(columns=[label_column_name])
+                  if label_column_name is not None:
+                      features_df = df.drop(columns=[label_column_name])
+                  else:
+                      features_df = df
 
                   evaluation_data = xgboost.DMatrix(
-                      data=df,
+                      data=features_df,
                       enable_categorical=True,
                   )
 
@@ -4105,14 +4123,18 @@ folders:
 
                   predictions = model.predict(evaluation_data)
 
+                  # Insert predictions column first
+                  df.insert(loc=0, column=prediction_column_name, value=predictions)
+
                   Path(predictions_path).parent.mkdir(parents=True, exist_ok=True)
-                  numpy.savetxt(predictions_path, predictions)
+                  df.to_parquet(path=predictions_path, index=False)
 
               import argparse
               _parser = argparse.ArgumentParser(prog='Xgboost predict on ApacheParquet', description='Makes predictions using a trained XGBoost model.')
               _parser.add_argument("--data", dest="data_path", type=str, required=True, default=argparse.SUPPRESS)
               _parser.add_argument("--model", dest="model_path", type=str, required=True, default=argparse.SUPPRESS)
               _parser.add_argument("--label-column-name", dest="label_column_name", type=str, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--prediction-column-name", dest="prediction_column_name", type=str, required=False, default=argparse.SUPPRESS)
               _parser.add_argument("--predictions", dest="predictions_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
               _parsed_args = vars(_parser.parse_args())
 
@@ -4127,25 +4149,37 @@ folders:
                 then:
                 - --label-column-name
                 - {inputValue: label_column_name}
+            - if:
+                cond: {isPresent: prediction_column_name}
+                then:
+                - --prediction-column-name
+                - {inputValue: prediction_column_name}
             - --predictions
             - {outputPath: predictions}
   - name: PyTorch
     components:
-    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/d8c4cf5e6403bc65bcf8d606e6baf87e2528a3dc/components/PyTorch/Create_fully_connected_network/component.yaml
-      digest: 6074655c1dddbafcd7a4d618ba1d2489fe3f53444399f1450a23c4acc69280c5
+    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/92aa941c738e5b2fe957f987925053bf70996264/components/PyTorch/Create_fully_connected_network/component.yaml
+      digest: 6d2718ef53bdd1fde52eefceb138b338b3a497585b344ae923040c70a560dde8
       text: |
         name: Create fully connected pytorch network
-        description: Creates fully-connected network in PyTorch ScriptModule format
+        description: Creates untrained fully-connected network in PyTorch ScriptModule format.
         metadata:
-          annotations:
-            author: Alexey Volkov <alexey.volkov@ark-kun.com>
-            canonical_location: 'https://raw.githubusercontent.com/Ark-kun/pipeline_components/master/components/PyTorch/Create_fully_connected_network/component.yaml'
+          annotations: {author: Alexey Volkov <alexey.volkov@ark-kun.com>, canonical_location: 'https://raw.githubusercontent.com/Ark-kun/pipeline_components/master/components/PyTorch/Create_fully_connected_network/component.yaml'}
         inputs:
-        - {name: layer_sizes, type: JsonArray}
-        - {name: activation_name, type: String, default: relu, optional: true}
-        - {name: random_seed, type: Integer, default: '0', optional: true}
+        - {name: input_size, type: Integer, description: Size of the input vector.}
+        - {name: hidden_layer_sizes, type: JsonArray, description: Sizes of the hidden layers.,
+          default: '[]', optional: true}
+        - {name: output_size, type: Integer, description: Size of the output vector., default: '1',
+          optional: true}
+        - {name: activation_name, type: String, description: Name of the activation function
+            used between layers., default: relu, optional: true}
+        - {name: output_activation_name, type: String, description: Name of the activation
+            function used after output layers., optional: true}
+        - {name: random_seed, type: Integer, description: Controls the seed of the random
+            processes., default: '0', optional: true}
         outputs:
-        - {name: network, type: PyTorchScriptModule}
+        - {name: model, type: PyTorchScriptModule, description: Untrained model in PyTorch
+            Script Module format.}
         implementation:
           container:
             image: pytorch/pytorch:1.7.1-cuda11.0-cudnn8-runtime
@@ -4163,12 +4197,25 @@ folders:
                   return file_path
 
               def create_fully_connected_pytorch_network(
-                  layer_sizes,
-                  network_path,
+                  input_size,
+                  model_path,
+                  hidden_layer_sizes = [],
+                  output_size = 1,
                   activation_name = 'relu',
+                  output_activation_name = None,
                   random_seed = 0,
               ):
-                  '''Creates fully-connected network in PyTorch ScriptModule format'''
+                  """Creates untrained fully-connected network in PyTorch ScriptModule format.
+
+                  Args:
+                      input_size: Size of the input vector.
+                      model_path: Untrained model in PyTorch Script Module format.
+                      hidden_layer_sizes: Sizes of the hidden layers.
+                      output_size: Size of the output vector.
+                      activation_name: Name of the activation function used between layers.
+                      output_activation_name: Name of the activation function used after output layers.
+                      random_seed: Controls the seed of the random processes.
+                  """
                   import torch
                   torch.manual_seed(random_seed)
 
@@ -4181,42 +4228,72 @@ folders:
                           return activation(input)
 
                   layers = []
-                  for layer_idx in range(len(layer_sizes) - 1):
-                      layer = torch.nn.Linear(layer_sizes[layer_idx], layer_sizes[layer_idx + 1])
+                  prev_layer_size = input_size
+                  for layer_size in hidden_layer_sizes:
+                      layer = torch.nn.Linear(prev_layer_size, layer_size)
+                      prev_layer_size = layer_size
                       layers.append(layer)
-                      if layer_idx < len(layer_sizes) - 2:
-                          layers.append(ActivationLayer())
+                      layers.append(ActivationLayer())
+
+                  # Adding the output layer
+                  layers.append(torch.nn.Linear(prev_layer_size, output_size))
+
+                  # Adding the optional activation after the output layer
+                  if output_activation_name:
+                      output_activation = getattr(torch, output_activation_name, None) or getattr(torch.nn.functional, output_activation_name, None)
+                      class OutputActivationLayer(torch.nn.Module):
+                          def forward(self, input):
+                              return output_activation(input)
+                      layers.append(OutputActivationLayer())
 
                   network = torch.nn.Sequential(*layers)
                   script_module = torch.jit.script(network)
                   print(script_module)
-                  script_module.save(network_path)
+                  script_module.save(model_path)
 
               import json
               import argparse
-              _parser = argparse.ArgumentParser(prog='Create fully connected pytorch network', description='Creates fully-connected network in PyTorch ScriptModule format')
-              _parser.add_argument("--layer-sizes", dest="layer_sizes", type=json.loads, required=True, default=argparse.SUPPRESS)
+              _parser = argparse.ArgumentParser(prog='Create fully connected pytorch network', description='Creates untrained fully-connected network in PyTorch ScriptModule format.')
+              _parser.add_argument("--input-size", dest="input_size", type=int, required=True, default=argparse.SUPPRESS)
+              _parser.add_argument("--hidden-layer-sizes", dest="hidden_layer_sizes", type=json.loads, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--output-size", dest="output_size", type=int, required=False, default=argparse.SUPPRESS)
               _parser.add_argument("--activation-name", dest="activation_name", type=str, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--output-activation-name", dest="output_activation_name", type=str, required=False, default=argparse.SUPPRESS)
               _parser.add_argument("--random-seed", dest="random_seed", type=int, required=False, default=argparse.SUPPRESS)
-              _parser.add_argument("--network", dest="network_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+              _parser.add_argument("--model", dest="model_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
               _parsed_args = vars(_parser.parse_args())
 
               _outputs = create_fully_connected_pytorch_network(**_parsed_args)
             args:
-            - --layer-sizes
-            - {inputValue: layer_sizes}
+            - --input-size
+            - {inputValue: input_size}
+            - if:
+                cond: {isPresent: hidden_layer_sizes}
+                then:
+                - --hidden-layer-sizes
+                - {inputValue: hidden_layer_sizes}
+            - if:
+                cond: {isPresent: output_size}
+                then:
+                - --output-size
+                - {inputValue: output_size}
             - if:
                 cond: {isPresent: activation_name}
                 then:
                 - --activation-name
                 - {inputValue: activation_name}
             - if:
+                cond: {isPresent: output_activation_name}
+                then:
+                - --output-activation-name
+                - {inputValue: output_activation_name}
+            - if:
                 cond: {isPresent: random_seed}
                 then:
                 - --random-seed
                 - {inputValue: random_seed}
-            - --network
-            - {outputPath: network}
+            - --model
+            - {outputPath: model}
     - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/96a177dd71d54c98573c4101d9a05ac801f1fa54/components/PyTorch/Train_PyTorch_model/from_CSV/component.yaml
       digest: 3c84cd7eddeda2d59ca84d37ea416bd78427aea8eeccd85005e958c203914b67
       text: |
@@ -4452,6 +4529,522 @@ folders:
                 - {inputValue: random_seed}
             - --trained-model
             - {outputPath: trained_model}
+    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/7799eb6ae4c4bb817f7461e2e3ffc83cbe2d50a7/components/PyTorch/Predict/on_CSV/component.yaml
+      digest: 40c4265e98ff35fa787bc35097a43df538ca43f7c7e802a990fc9c9e1d63e484
+      text: |
+        name: Predict with PyTorch model on CSV data
+        description: Makes predictions using a trained PyTorch model.
+        metadata:
+          annotations: {author: Alexey Volkov <alexey.volkov@ark-kun.com>, canonical_location: 'https://raw.githubusercontent.com/Ark-kun/pipeline_components/master/components/PyTorch/Predict/on_CSV/component.yaml',
+            python_dependencies_time: '2025-11-30'}
+        inputs:
+        - {name: data, type: CSV, description: Feature data in CSV format.}
+        - {name: model, type: PyTorchScriptModule, description: Trained model in binary PyTorchScriptModule
+            format.}
+        - {name: label_column_name, type: String, description: Optional. Name of the column
+            containing the label data that is excluded during the prediction., optional: true}
+        - {name: prediction_column_name, type: String, default: prediction, optional: true}
+        - {name: batch_size, type: Integer, default: '100', optional: true}
+        outputs:
+        - {name: predictions, type: CSV, description: Model predictions.}
+        implementation:
+          container:
+            image: pytorch/pytorch:1.7.1-cuda11.0-cudnn8-runtime
+            command:
+            - sh
+            - -c
+            - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+              'pandas==2.0.3' 'numpy==1.24.4' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m
+              pip install --quiet --no-warn-script-location 'pandas==2.0.3' 'numpy==1.24.4'
+              --user) && "$0" "$@"
+            - sh
+            - -ec
+            - |
+              program_path=$(mktemp)
+              printf "%s" "$0" > "$program_path"
+              python3 -u "$program_path" "$@"
+            - |
+              def _make_parent_dirs_and_return_path(file_path: str):
+                  import os
+
+                  os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                  return file_path
+
+              def predict_with_PyTorch_model_on_CSV_data(
+                  data_path,
+                  model_path,
+                  predictions_path,
+                  label_column_name = None,
+                  prediction_column_name = "prediction",
+                  batch_size = 100,
+              ):
+                  """Makes predictions using a trained PyTorch model.
+
+                  Args:
+                      data_path: Feature data in CSV format.
+                      model_path: Trained model in binary PyTorchScriptModule format.
+                      predictions_path: Model predictions.
+                      label_column_name: Optional. Name of the column containing the label data that is excluded during the prediction.
+                  """
+                  from pathlib import Path
+
+                  import numpy
+                  import pandas
+                  import torch
+
+                  model = torch.jit.load(model_path)
+                  # Switch the model to evaluation mode
+                  model.eval()
+
+                  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                  print(f"{torch.cuda.is_available()=}")
+                  print(f"{device=}")
+                  model.to(device)
+
+                  df = pandas.read_csv(
+                      data_path,
+                  ).convert_dtypes()
+                  print("Evaluation data information:")
+                  df.info(verbose=True)
+
+                  if label_column_name is not None:
+                      features_df = df.drop(columns=[label_column_name])
+                  else:
+                      features_df = df
+
+                  # TODO: Batch processing
+                  features_numpy = features_df.to_numpy(dtype=numpy.float32)
+                  features_tensor = torch.tensor(features_numpy).to(device)
+                  print(f"{features_tensor.shape=}")
+                  predictions_tensor = model(features_tensor)
+                  predictions = predictions_tensor.cpu().detach().numpy()
+
+                  # Insert predictions column first
+                  df.insert(loc=0, column=prediction_column_name, value=predictions)
+
+                  Path(predictions_path).parent.mkdir(parents=True, exist_ok=True)
+                  df.to_csv(predictions_path, index=False)
+
+              import argparse
+              _parser = argparse.ArgumentParser(prog='Predict with PyTorch model on CSV data', description='Makes predictions using a trained PyTorch model.')
+              _parser.add_argument("--data", dest="data_path", type=str, required=True, default=argparse.SUPPRESS)
+              _parser.add_argument("--model", dest="model_path", type=str, required=True, default=argparse.SUPPRESS)
+              _parser.add_argument("--label-column-name", dest="label_column_name", type=str, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--prediction-column-name", dest="prediction_column_name", type=str, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--batch-size", dest="batch_size", type=int, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--predictions", dest="predictions_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+              _parsed_args = vars(_parser.parse_args())
+
+              _outputs = predict_with_PyTorch_model_on_CSV_data(**_parsed_args)
+            args:
+            - --data
+            - {inputPath: data}
+            - --model
+            - {inputPath: model}
+            - if:
+                cond: {isPresent: label_column_name}
+                then:
+                - --label-column-name
+                - {inputValue: label_column_name}
+            - if:
+                cond: {isPresent: prediction_column_name}
+                then:
+                - --prediction-column-name
+                - {inputValue: prediction_column_name}
+            - if:
+                cond: {isPresent: batch_size}
+                then:
+                - --batch-size
+                - {inputValue: batch_size}
+            - --predictions
+            - {outputPath: predictions}
+    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/d2b5b635198ce661c9c58e3a1817c4c018e7c40b/components/PyTorch/Train_PyTorch_model/from_ApacheParquet/component.yaml
+      digest: e906d1a7eb5636a68325a1ac5b481ddf5f3c4dbd6de51ce8143f67a3ac87ec35
+      text: |
+        name: Train pytorch model from ApacheParquet
+        description: Trains PyTorch model.
+        metadata:
+          annotations: {author: Alexey Volkov <alexey.volkov@ark-kun.com>, canonical_location: 'https://raw.githubusercontent.com/Ark-kun/pipeline_components/master/components/PyTorch/Train_PyTorch_model/from_CSV/component.yaml',
+            python_dependencies_time: '2025-11-30'}
+        inputs:
+        - {name: model, type: PyTorchScriptModule, description: Model in PyTorch format.}
+        - {name: training_data, type: ApacheParquet, description: Tabular dataset for training.}
+        - {name: label_column_name, type: String, description: Name of the table column to
+            use as label.}
+        - {name: loss_function_name, type: String, description: Name of the loss function.,
+          default: mse_loss, optional: true}
+        - {name: number_of_epochs, type: Integer, description: Number of training epochs.,
+          default: '1', optional: true}
+        - {name: learning_rate, type: Float, description: Learning rate of the optimizer.,
+          default: '0.1', optional: true}
+        - {name: optimizer_name, type: String, description: Name of the optimizer., default: Adadelta,
+          optional: true}
+        - {name: optimizer_parameters, type: JsonObject, description: Optimizer parameters
+            in dictionary form., optional: true}
+        - {name: batch_size, type: Integer, description: Number of training samples to use
+            in each batch., default: '32', optional: true}
+        - {name: batch_log_interval, type: Integer, description: Print training summary after
+            every N batches., default: '100', optional: true}
+        - {name: random_seed, type: Integer, description: Controls the seed of the random
+            processes., default: '0', optional: true}
+        outputs:
+        - {name: trained_model, type: PyTorchScriptModule, description: Trained model in PyTorch
+            format.}
+        implementation:
+          container:
+            image: pytorch/pytorch:1.7.1-cuda11.0-cudnn8-runtime
+            command:
+            - sh
+            - -c
+            - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+              'pandas==2.0.3' 'numpy==1.24.4' 'pyarrow==17.0.0' || PIP_DISABLE_PIP_VERSION_CHECK=1
+              python3 -m pip install --quiet --no-warn-script-location 'pandas==2.0.3' 'numpy==1.24.4'
+              'pyarrow==17.0.0' --user) && "$0" "$@"
+            - sh
+            - -ec
+            - |
+              program_path=$(mktemp)
+              printf "%s" "$0" > "$program_path"
+              python3 -u "$program_path" "$@"
+            - |
+              def _make_parent_dirs_and_return_path(file_path: str):
+                  import os
+
+                  os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                  return file_path
+
+              def train_pytorch_model_from_ApacheParquet(
+                  model_path,
+                  training_data_path,
+                  trained_model_path,
+                  label_column_name,
+                  loss_function_name = "mse_loss",
+                  number_of_epochs = 1,
+                  learning_rate = 0.1,
+                  optimizer_name = "Adadelta",
+                  optimizer_parameters = None,
+                  batch_size = 32,
+                  batch_log_interval = 100,
+                  random_seed = 0,
+              ):
+                  """Trains PyTorch model.
+
+                  Args:
+                      model_path: Model in PyTorch format.
+                      training_data_path: Tabular dataset for training.
+                      trained_model_path: Trained model in PyTorch format.
+                      label_column_name: Name of the table column to use as label.
+                      loss_function_name: Name of the loss function.
+                      number_of_epochs: Number of training epochs.
+                      learning_rate: Learning rate of the optimizer.
+                      optimizer_name: Name of the optimizer.
+                      optimizer_parameters: Optimizer parameters in dictionary form.
+                      batch_size: Number of training samples to use in each batch.
+                      batch_log_interval: Print training summary after every N batches.
+                      random_seed: Controls the seed of the random processes.
+                  """
+                  import pandas
+                  import torch
+
+                  torch.manual_seed(random_seed)
+
+                  use_cuda = torch.cuda.is_available()
+                  device = torch.device("cuda" if use_cuda else "cpu")
+
+                  model = torch.jit.load(model_path)
+                  model.to(device)
+                  model.train()
+
+                  optimizer_class = getattr(torch.optim, optimizer_name, None)
+                  if not optimizer_class:
+                      raise ValueError(f"Optimizer '{optimizer_name}' was not found.")
+
+                  optimizer_parameters = optimizer_parameters or {}
+                  optimizer_parameters["lr"] = learning_rate
+                  optimizer = optimizer_class(model.parameters(), **optimizer_parameters)
+
+                  loss_function = (
+                      getattr(torch, loss_function_name, None)
+                      or getattr(torch.nn, loss_function_name, None)
+                      or getattr(torch.nn.functional, loss_function_name, None)
+                  )
+                  if not loss_function:
+                      raise ValueError(f"Loss function '{loss_function_name}' was not found.")
+
+                  class CsvDataset(torch.utils.data.Dataset):
+
+                      def __init__(
+                          self,
+                          file_path,
+                          label_column_name,
+                          drop_nan_columns_or_rows = "columns",
+                      ):
+                          dataframe = pandas.read_parquet(file_path)
+                          # Preventing error: default_collate: batch must contain tensors, numpy arrays, numbers, dicts or lists; found object
+                          if drop_nan_columns_or_rows == "columns":
+                              non_nan_data = dataframe.dropna(axis="columns")
+                              removed_columns = set(dataframe.columns) - set(non_nan_data.columns)
+                              if removed_columns:
+                                  print("Skipping columns with NaNs: " + str(removed_columns))
+                              dataframe = non_nan_data
+                          if drop_nan_columns_or_rows == "rows":
+                              non_nan_data = dataframe.dropna(axis="index")
+                              number_of_removed_rows = len(dataframe) - len(non_nan_data)
+                              if number_of_removed_rows:
+                                  print(f"Skipped {number_of_removed_rows} rows with NaNs.")
+                              dataframe = non_nan_data
+                          numerical_data = dataframe.select_dtypes(include="number")
+                          non_numerical_data = dataframe.select_dtypes(exclude="number")
+                          if not non_numerical_data.empty:
+                              print("Skipping non-number columns:")
+                              print(non_numerical_data.dtypes)
+                          self._dataframe = dataframe
+                          self.labels = numerical_data[[label_column_name]]
+                          self.features = numerical_data.drop(columns=[label_column_name])
+
+                      def __len__(self):
+                          return len(self._dataframe)
+
+                      def __getitem__(self, index):
+                          return [
+                              self.features.loc[index].to_numpy(dtype="float32"),
+                              self.labels.loc[index].to_numpy(dtype="float32"),
+                          ]
+
+                  dataset = CsvDataset(
+                      file_path=training_data_path,
+                      label_column_name=label_column_name,
+                  )
+                  train_loader = torch.utils.data.DataLoader(
+                      dataset=dataset,
+                      batch_size=batch_size,
+                      shuffle=True,
+                  )
+
+                  last_full_batch_loss = None
+                  for epoch in range(1, number_of_epochs + 1):
+                      for batch_idx, (data, target) in enumerate(train_loader):
+                          data, target = data.to(device), target.to(device)
+                          optimizer.zero_grad()
+                          output = model(data)
+                          loss = loss_function(output, target)
+                          loss.backward()
+                          optimizer.step()
+                          if len(data) == batch_size:
+                              last_full_batch_loss = loss.item()
+                          if batch_idx % batch_log_interval == 0:
+                              print(
+                                  "Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}".format(
+                                      epoch,
+                                      batch_idx * len(data),
+                                      len(train_loader.dataset),
+                                      100.0 * batch_idx / len(train_loader),
+                                      loss.item(),
+                                  )
+                              )
+                      print(
+                          f"Training epoch {epoch} completed. Last full batch loss: {last_full_batch_loss:.6f}"
+                      )
+
+                  # print(optimizer.state_dict())
+                  model.save(trained_model_path)
+
+              import json
+              import argparse
+              _parser = argparse.ArgumentParser(prog='Train pytorch model from ApacheParquet', description='Trains PyTorch model.')
+              _parser.add_argument("--model", dest="model_path", type=str, required=True, default=argparse.SUPPRESS)
+              _parser.add_argument("--training-data", dest="training_data_path", type=str, required=True, default=argparse.SUPPRESS)
+              _parser.add_argument("--label-column-name", dest="label_column_name", type=str, required=True, default=argparse.SUPPRESS)
+              _parser.add_argument("--loss-function-name", dest="loss_function_name", type=str, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--number-of-epochs", dest="number_of_epochs", type=int, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--learning-rate", dest="learning_rate", type=float, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--optimizer-name", dest="optimizer_name", type=str, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--optimizer-parameters", dest="optimizer_parameters", type=json.loads, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--batch-size", dest="batch_size", type=int, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--batch-log-interval", dest="batch_log_interval", type=int, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--random-seed", dest="random_seed", type=int, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--trained-model", dest="trained_model_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+              _parsed_args = vars(_parser.parse_args())
+
+              _outputs = train_pytorch_model_from_ApacheParquet(**_parsed_args)
+            args:
+            - --model
+            - {inputPath: model}
+            - --training-data
+            - {inputPath: training_data}
+            - --label-column-name
+            - {inputValue: label_column_name}
+            - if:
+                cond: {isPresent: loss_function_name}
+                then:
+                - --loss-function-name
+                - {inputValue: loss_function_name}
+            - if:
+                cond: {isPresent: number_of_epochs}
+                then:
+                - --number-of-epochs
+                - {inputValue: number_of_epochs}
+            - if:
+                cond: {isPresent: learning_rate}
+                then:
+                - --learning-rate
+                - {inputValue: learning_rate}
+            - if:
+                cond: {isPresent: optimizer_name}
+                then:
+                - --optimizer-name
+                - {inputValue: optimizer_name}
+            - if:
+                cond: {isPresent: optimizer_parameters}
+                then:
+                - --optimizer-parameters
+                - {inputValue: optimizer_parameters}
+            - if:
+                cond: {isPresent: batch_size}
+                then:
+                - --batch-size
+                - {inputValue: batch_size}
+            - if:
+                cond: {isPresent: batch_log_interval}
+                then:
+                - --batch-log-interval
+                - {inputValue: batch_log_interval}
+            - if:
+                cond: {isPresent: random_seed}
+                then:
+                - --random-seed
+                - {inputValue: random_seed}
+            - --trained-model
+            - {outputPath: trained_model}
+    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/7799eb6ae4c4bb817f7461e2e3ffc83cbe2d50a7/components/PyTorch/Predict/on_ApacheParquet/component.yaml
+      digest: 490205810db2510d850c672770ca2b15d2cc18b3e9336c2904ab0f5953edd58a
+      text: |
+        name: Predict with PyTorch model on ApacheParquet data
+        description: Makes predictions using a trained PyTorch model.
+        metadata:
+          annotations: {author: Alexey Volkov <alexey.volkov@ark-kun.com>, canonical_location: 'https://raw.githubusercontent.com/Ark-kun/pipeline_components/master/components/PyTorch/Predict/on_CSV/component.yaml',
+            python_dependencies_time: '2025-11-30'}
+        inputs:
+        - {name: data, type: ApacheParquet, description: Feature data in CSV format.}
+        - {name: model, type: PyTorchScriptModule, description: Trained model in binary PyTorchScriptModule
+            format.}
+        - {name: label_column_name, type: String, description: Optional. Name of the column
+            containing the label data that is excluded during the prediction., optional: true}
+        - {name: prediction_column_name, type: String, default: prediction, optional: true}
+        - {name: batch_size, type: Integer, default: '100', optional: true}
+        outputs:
+        - {name: predictions, type: ApacheParquet, description: Model predictions.}
+        implementation:
+          container:
+            image: pytorch/pytorch:1.7.1-cuda11.0-cudnn8-runtime
+            command:
+            - sh
+            - -c
+            - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+              'pandas==2.0.3' 'numpy==1.24.4' 'pyarrow==17.0.0' || PIP_DISABLE_PIP_VERSION_CHECK=1
+              python3 -m pip install --quiet --no-warn-script-location 'pandas==2.0.3' 'numpy==1.24.4'
+              'pyarrow==17.0.0' --user) && "$0" "$@"
+            - sh
+            - -ec
+            - |
+              program_path=$(mktemp)
+              printf "%s" "$0" > "$program_path"
+              python3 -u "$program_path" "$@"
+            - |
+              def _make_parent_dirs_and_return_path(file_path: str):
+                  import os
+
+                  os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                  return file_path
+
+              def predict_with_PyTorch_model_on_ApacheParquet_data(
+                  data_path,
+                  model_path,
+                  predictions_path,
+                  label_column_name = None,
+                  prediction_column_name = "prediction",
+                  batch_size = 100,
+              ):
+                  """Makes predictions using a trained PyTorch model.
+
+                  Args:
+                      data_path: Feature data in CSV format.
+                      model_path: Trained model in binary PyTorchScriptModule format.
+                      predictions_path: Model predictions.
+                      label_column_name: Optional. Name of the column containing the label data that is excluded during the prediction.
+                  """
+                  from pathlib import Path
+
+                  import numpy
+                  import pandas
+                  import torch
+
+                  model = torch.jit.load(model_path)
+                  # Switch the model to evaluation mode
+                  model.eval()
+
+                  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                  print(f"{torch.cuda.is_available()=}")
+                  print(f"{device=}")
+                  model.to(device)
+
+                  df = pandas.read_parquet(
+                      data_path,
+                  )
+                  print("Evaluation data information:")
+                  df.info(verbose=True)
+
+                  if label_column_name is not None:
+                      features_df = df.drop(columns=[label_column_name])
+                  else:
+                      features_df = df
+
+                  # TODO: Batch processing
+                  features_numpy = features_df.to_numpy(dtype=numpy.float32)
+                  features_tensor = torch.tensor(features_numpy).to(device)
+                  print(f"{features_tensor.shape=}")
+                  predictions_tensor = model(features_tensor)
+                  predictions = predictions_tensor.cpu().detach().numpy()
+
+                  # Insert predictions column first
+                  df.insert(loc=0, column=prediction_column_name, value=predictions)
+
+                  Path(predictions_path).parent.mkdir(parents=True, exist_ok=True)
+                  df.to_parquet(predictions_path)
+
+              import argparse
+              _parser = argparse.ArgumentParser(prog='Predict with PyTorch model on ApacheParquet data', description='Makes predictions using a trained PyTorch model.')
+              _parser.add_argument("--data", dest="data_path", type=str, required=True, default=argparse.SUPPRESS)
+              _parser.add_argument("--model", dest="model_path", type=str, required=True, default=argparse.SUPPRESS)
+              _parser.add_argument("--label-column-name", dest="label_column_name", type=str, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--prediction-column-name", dest="prediction_column_name", type=str, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--batch-size", dest="batch_size", type=int, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--predictions", dest="predictions_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+              _parsed_args = vars(_parser.parse_args())
+
+              _outputs = predict_with_PyTorch_model_on_ApacheParquet_data(**_parsed_args)
+            args:
+            - --data
+            - {inputPath: data}
+            - --model
+            - {inputPath: model}
+            - if:
+                cond: {isPresent: label_column_name}
+                then:
+                - --label-column-name
+                - {inputValue: label_column_name}
+            - if:
+                cond: {isPresent: prediction_column_name}
+                then:
+                - --prediction-column-name
+                - {inputValue: prediction_column_name}
+            - if:
+                cond: {isPresent: batch_size}
+                then:
+                - --batch-size
+                - {inputValue: batch_size}
+            - --predictions
+            - {outputPath: predictions}
     - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/d8c4cf5e6403bc65bcf8d606e6baf87e2528a3dc/components/PyTorch/Convert_to_OnnxModel_from_PyTorchScriptModule/component.yaml
       digest: 7edca2cd8212000a52dedf6c60aeb808fd022818ccb0ee64ddc85259b84e6186
       text: |
@@ -4566,19 +5159,28 @@ folders:
             - {outputPath: Model archive}
   - name: Tensorflow
     components:
-    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/f3a9769d35a057c31a498e0667cae2e4a830c5b0/components/tensorflow/Create_fully_connected_network/component.yaml
-      digest: c97df1a0fe9b4d58300ffdf97dd63555cef1246ec93f9c68a0667dc8a99f1e1c
+    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/92aa941c738e5b2fe957f987925053bf70996264/components/tensorflow/Create_fully_connected_network/component.yaml
+      digest: be1b5011e658a1b9f77fce7c5cce406fd0440064f17309b900c4116927cc3821
       text: |
         name: Create fully connected tensorflow network
-        description: Creates fully-connected network in Tensorflow SavedModel format
+        description: Creates untrained fully-connected network in Tensorflow SavedModel format.
         metadata:
           annotations: {author: Alexey Volkov <alexey.volkov@ark-kun.com>, canonical_location: 'https://raw.githubusercontent.com/Ark-kun/pipeline_components/master/components/tensorflow/Create_fully_connected_network/component.yaml'}
         inputs:
-        - {name: layer_sizes, type: JsonArray}
-        - {name: activation_name, type: String, default: relu, optional: true}
-        - {name: random_seed, type: Integer, default: '0', optional: true}
+        - {name: input_size, type: Integer, description: Size of the input vector.}
+        - {name: hidden_layer_sizes, type: JsonArray, description: Sizes of the hidden layers.,
+          default: '[]', optional: true}
+        - {name: output_size, type: Integer, description: Size of the output vector., default: '1',
+          optional: true}
+        - {name: activation_name, type: String, description: Name of the activation function
+            used between layers., default: relu, optional: true}
+        - {name: output_activation_name, type: String, description: Name of the activation
+            function used after output layers., optional: true}
+        - {name: random_seed, type: Integer, description: Controls the seed of the random
+            processes., default: '0', optional: true}
         outputs:
-        - {name: model, type: TensorflowSavedModel}
+        - {name: model, type: TensorflowSavedModel, description: Untrained model in Tensorflow
+            SavedModel format.}
         implementation:
           container:
             image: tensorflow/tensorflow:2.7.0
@@ -4596,24 +5198,36 @@ folders:
                   return file_path
 
               def create_fully_connected_tensorflow_network(
-                  layer_sizes,
+                  input_size,
                   model_path,
+                  hidden_layer_sizes = [],
+                  output_size = 1,
                   activation_name = "relu",
+                  output_activation_name = None,
                   random_seed = 0,
               ):
-                  """Creates fully-connected network in Tensorflow SavedModel format"""
+                  """Creates untrained fully-connected network in Tensorflow SavedModel format.
+
+                  Args:
+                      input_size: Size of the input vector.
+                      model_path: Untrained model in Tensorflow SavedModel format.
+                      hidden_layer_sizes: Sizes of the hidden layers.
+                      output_size: Size of the output vector.
+                      activation_name: Name of the activation function used between layers.
+                      output_activation_name: Name of the activation function used after output layers.
+                      random_seed: Controls the seed of the random processes.
+                  """
                   import tensorflow as tf
                   tf.random.set_seed(seed=random_seed)
 
-                  if len(layer_sizes) < 2:
-                      raise ValueError(f"Fully-connected network requires at least two layer sizes (input and output). Got {layer_sizes}.")
-
                   model = tf.keras.models.Sequential()
-                  model.add(tf.keras.Input(shape=(layer_sizes[0],)))
-                  for layer_size in layer_sizes[1:-1]:
+                  model.add(tf.keras.Input(shape=(input_size,)))
+                  for layer_size in hidden_layer_sizes:
                       model.add(tf.keras.layers.Dense(units=layer_size, activation=activation_name))
                   # The last layer is left without activation
-                  model.add(tf.keras.layers.Dense(units=layer_sizes[-1]))
+                  model.add(tf.keras.layers.Dense(units=output_size, activation=output_activation_name))
+
+                  print(model.summary())
 
                   # Using tf.keras.models.save_model instead of tf.saved_model.save to prevent downstream error:
                   #tf.saved_model.save(model, model_path)
@@ -4625,22 +5239,40 @@ folders:
 
               import json
               import argparse
-              _parser = argparse.ArgumentParser(prog='Create fully connected tensorflow network', description='Creates fully-connected network in Tensorflow SavedModel format')
-              _parser.add_argument("--layer-sizes", dest="layer_sizes", type=json.loads, required=True, default=argparse.SUPPRESS)
+              _parser = argparse.ArgumentParser(prog='Create fully connected tensorflow network', description='Creates untrained fully-connected network in Tensorflow SavedModel format.')
+              _parser.add_argument("--input-size", dest="input_size", type=int, required=True, default=argparse.SUPPRESS)
+              _parser.add_argument("--hidden-layer-sizes", dest="hidden_layer_sizes", type=json.loads, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--output-size", dest="output_size", type=int, required=False, default=argparse.SUPPRESS)
               _parser.add_argument("--activation-name", dest="activation_name", type=str, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--output-activation-name", dest="output_activation_name", type=str, required=False, default=argparse.SUPPRESS)
               _parser.add_argument("--random-seed", dest="random_seed", type=int, required=False, default=argparse.SUPPRESS)
               _parser.add_argument("--model", dest="model_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
               _parsed_args = vars(_parser.parse_args())
 
               _outputs = create_fully_connected_tensorflow_network(**_parsed_args)
             args:
-            - --layer-sizes
-            - {inputValue: layer_sizes}
+            - --input-size
+            - {inputValue: input_size}
+            - if:
+                cond: {isPresent: hidden_layer_sizes}
+                then:
+                - --hidden-layer-sizes
+                - {inputValue: hidden_layer_sizes}
+            - if:
+                cond: {isPresent: output_size}
+                then:
+                - --output-size
+                - {inputValue: output_size}
             - if:
                 cond: {isPresent: activation_name}
                 then:
                 - --activation-name
                 - {inputValue: activation_name}
+            - if:
+                cond: {isPresent: output_activation_name}
+                then:
+                - --output-activation-name
+                - {inputValue: output_activation_name}
             - if:
                 cond: {isPresent: random_seed}
                 then:
@@ -4648,26 +5280,37 @@ folders:
                 - {inputValue: random_seed}
             - --model
             - {outputPath: model}
-    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/c504a4010348c50eaaf6d4337586ccc008f4dcef/components/tensorflow/Train_model_using_Keras/on_CSV/component.yaml
-      digest: 42ae60c889034dbad74815653e95b4f7d576b5f47f803173e8679c7b54984609
+    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/92aa941c738e5b2fe957f987925053bf70996264/components/tensorflow/Train_model_using_Keras/on_CSV/component.yaml
+      digest: 2b0a50cae42e7469cf0add42eae88f66748e71a6826a087873b216aef3c687f9
       text: |
         name: Train model using Keras on CSV
+        description: Trains TensorFlow model.
         metadata:
           annotations: {author: Alexey Volkov <alexey.volkov@ark-kun.com>, canonical_location: 'https://raw.githubusercontent.com/Ark-kun/pipeline_components/master/components/tensorflow/Train_model_using_Keras/on_CSV/component.yaml'}
         inputs:
-        - {name: training_data, type: CSV}
-        - {name: model, type: TensorflowSavedModel}
-        - {name: label_column_name, type: String}
-        - {name: loss_function_name, type: String, default: mean_squared_error, optional: true}
-        - {name: number_of_epochs, type: Integer, default: '1', optional: true}
-        - {name: learning_rate, type: Float, default: '0.1', optional: true}
-        - {name: optimizer_name, type: String, default: Adadelta, optional: true}
-        - {name: optimizer_parameters, type: JsonObject, optional: true}
-        - {name: batch_size, type: Integer, default: '32', optional: true}
-        - {name: metric_names, type: JsonArray, optional: true}
-        - {name: random_seed, type: Integer, default: '0', optional: true}
+        - {name: training_data, type: CSV, description: Tabular dataset for training.}
+        - {name: model, type: TensorflowSavedModel, description: Model in TensorFlow format.}
+        - {name: label_column_name, type: String, description: Name of the table column to
+            use as label.}
+        - {name: loss_function_name, type: String, description: Name of the loss function.,
+          default: mean_squared_error, optional: true}
+        - {name: number_of_epochs, type: Integer, description: Number of training epochs.,
+          default: '1', optional: true}
+        - {name: learning_rate, type: Float, description: Learning rate of the optimizer.,
+          default: '0.1', optional: true}
+        - {name: optimizer_name, type: String, description: Name of the optimizer., default: Adadelta,
+          optional: true}
+        - {name: optimizer_parameters, type: JsonObject, description: Optimizer parameters
+            in dictionary form., optional: true}
+        - {name: batch_size, type: Integer, description: Number of training samples to use
+            in each batch., default: '32', optional: true}
+        - {name: metric_names, type: JsonArray, description: A list of metrics to evaluate
+            during the training., optional: true}
+        - {name: random_seed, type: Integer, description: Controls the seed of the random
+            processes., default: '0', optional: true}
         outputs:
-        - {name: trained_model, type: TensorflowSavedModel}
+        - {name: trained_model, type: TensorflowSavedModel, description: Trained model in
+            TensorFlow format.}
         implementation:
           container:
             image: tensorflow/tensorflow:2.8.0
@@ -4698,6 +5341,22 @@ folders:
                   metric_names = None,
                   random_seed = 0,
               ):
+                  """Trains TensorFlow model.
+
+                  Args:
+                      training_data_path: Tabular dataset for training.
+                      model_path: Model in TensorFlow format.
+                      trained_model_path: Trained model in TensorFlow format.
+                      label_column_name: Name of the table column to use as label.
+                      loss_function_name: Name of the loss function.
+                      number_of_epochs: Number of training epochs.
+                      learning_rate: Learning rate of the optimizer.
+                      optimizer_name: Name of the optimizer.
+                      optimizer_parameters: Optimizer parameters in dictionary form.
+                      batch_size: Number of training samples to use in each batch.
+                      metric_names: A list of metrics to evaluate during the training.
+                      random_seed: Controls the seed of the random processes.
+                  """
                   import tensorflow as tf
                   tf.random.set_seed(seed=random_seed)
 
@@ -4756,7 +5415,7 @@ folders:
 
               import json
               import argparse
-              _parser = argparse.ArgumentParser(prog='Train model using Keras on CSV', description='')
+              _parser = argparse.ArgumentParser(prog='Train model using Keras on CSV', description='Trains TensorFlow model.')
               _parser.add_argument("--training-data", dest="training_data_path", type=str, required=True, default=argparse.SUPPRESS)
               _parser.add_argument("--model", dest="model_path", type=str, required=True, default=argparse.SUPPRESS)
               _parser.add_argument("--label-column-name", dest="label_column_name", type=str, required=True, default=argparse.SUPPRESS)
@@ -5043,6 +5702,122 @@ folders:
                 - {inputValue: random_seed}
             - --trained-model
             - {outputPath: trained_model}
+    - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/92aa941c738e5b2fe957f987925053bf70996264/components/tensorflow/Predict/on_CSV/component.yaml
+      digest: db1fcabb3f542b203b59c799853be2d4d74253beb4e19d0eef3f5bf4b643222f
+      text: |
+        name: Predict with TensorFlow model on CSV data
+        description: Makes predictions using TensorFlow model.
+        metadata:
+          annotations: {author: Alexey Volkov <alexey.volkov@ark-kun.com>, canonical_location: 'https://raw.githubusercontent.com/Ark-kun/pipeline_components/master/components/tensorflow/Predict/on_CSV/component.yaml'}
+        inputs:
+        - {name: dataset, type: CSV, description: Tabular dataset for prediction.}
+        - {name: model, type: TensorflowSavedModel, description: Trained model in TensorFlow
+            format.}
+        - {name: label_column_name, type: String, description: Name of the table column to
+            use as label., optional: true}
+        - {name: batch_size, type: Integer, description: Number of samples to use in each
+            batch., default: '1000', optional: true}
+        outputs:
+        - {name: predictions, description: Predictions in multiline text format.}
+        implementation:
+          container:
+            image: tensorflow/tensorflow:2.9.1
+            command:
+            - sh
+            - -ec
+            - |
+              program_path=$(mktemp)
+              printf "%s" "$0" > "$program_path"
+              python3 -u "$program_path" "$@"
+            - |
+              def _make_parent_dirs_and_return_path(file_path: str):
+                  import os
+                  os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                  return file_path
+
+              def predict_with_TensorFlow_model_on_CSV_data(
+                  dataset_path,
+                  model_path,
+                  predictions_path,
+                  label_column_name = None,
+                  batch_size = 1000,
+              ):
+                  """Makes predictions using TensorFlow model.
+
+                  Args:
+                      dataset_path: Tabular dataset for prediction.
+                      model_path: Trained model in TensorFlow format.
+                      predictions_path: Predictions in multiline text format.
+                      label_column_name: Name of the table column to use as label.
+                      batch_size: Number of samples to use in each batch.
+                  """
+                  import numpy
+                  import tensorflow as tf
+
+                  model = tf.saved_model.load(export_dir=model_path)
+
+                  dataset = tf.data.experimental.make_csv_dataset(
+                      file_pattern=dataset_path,
+                      batch_size=batch_size,
+                      label_name=label_column_name,
+                      header=True,
+                      num_epochs=1,
+                      shuffle=False,
+                      ignore_errors=False,
+                  )
+
+                  def stack_feature_batches(features_batch):
+                      # Need to stack individual feature columns to create a single feature tensor
+                      # Need to cast all column tensor types to float to prevent errors.
+                      list_of_feature_batches = list(
+                          tf.cast(x=feature_batch, dtype=tf.float32)
+                          for feature_batch in features_batch.values()
+                      )
+                      return tf.stack(list_of_feature_batches, axis=-1)
+
+                  def transform_features_and_drop_labels(features_batch, labels_batch):
+                      return stack_feature_batches(features_batch)
+
+                  dataset_map_fn = (
+                      transform_features_and_drop_labels
+                      if label_column_name
+                      else stack_feature_batches
+                  )
+
+                  dataset = dataset.map(dataset_map_fn)
+
+                  with open(predictions_path, "w") as predictions_file:
+                      for features_batch in dataset:
+                          predictions_tensor = model(features_batch)
+                          numpy.savetxt(predictions_file, predictions_tensor.numpy())
+
+              import argparse
+              _parser = argparse.ArgumentParser(prog='Predict with TensorFlow model on CSV data', description='Makes predictions using TensorFlow model.')
+              _parser.add_argument("--dataset", dest="dataset_path", type=str, required=True, default=argparse.SUPPRESS)
+              _parser.add_argument("--model", dest="model_path", type=str, required=True, default=argparse.SUPPRESS)
+              _parser.add_argument("--label-column-name", dest="label_column_name", type=str, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--batch-size", dest="batch_size", type=int, required=False, default=argparse.SUPPRESS)
+              _parser.add_argument("--predictions", dest="predictions_path", type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)
+              _parsed_args = vars(_parser.parse_args())
+
+              _outputs = predict_with_TensorFlow_model_on_CSV_data(**_parsed_args)
+            args:
+            - --dataset
+            - {inputPath: dataset}
+            - --model
+            - {inputPath: model}
+            - if:
+                cond: {isPresent: label_column_name}
+                then:
+                - --label-column-name
+                - {inputValue: label_column_name}
+            - if:
+                cond: {isPresent: batch_size}
+                then:
+                - --batch-size
+                - {inputValue: batch_size}
+            - --predictions
+            - {outputPath: predictions}
     - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/92aa941c738e5b2fe957f987925053bf70996264/components/tensorflow/Predict/on_ApacheParquet/component.yaml
       digest: 7e760242a9c9ce013a367b866d3d1d7411986367bcfa59d847d853d3219f7fe8
       text: |
@@ -6200,6 +6975,489 @@ folders:
               - --testonly
               # Enable JSON parsing
               - --json
+- name: ML Metrics
+  components:
+  - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/9b65c073ae0a131151454c7f9030cb1a553ca7ba/components/ml_metrics/Calculate_regression_metrics/from_CSV/component.yaml
+    digest: e78a53973d5a627f65770d65e1a07659e878f131038ccb461e15b9b4edc7aa19
+    text: |
+      name: Calculate regression metrics from CSV
+      description: Calculates regression metrics.
+      metadata:
+        annotations: {author: Alexey Volkov <alexey.volkov@ark-kun.com>, canonical_location: 'https://raw.githubusercontent.com/Ark-kun/pipeline_components/master/components/ml_metrics/Calculate_regression_metrics/from_CSV/component.yaml',
+          python_dependencies_time: '2025-11-30'}
+      inputs:
+      - {name: predictions, type: CSV}
+      - {name: label_column_name, type: String, default: label, optional: true}
+      - {name: prediction_column_name, type: String, default: prediction, optional: true}
+      outputs:
+      - {name: number_of_items, type: Integer}
+      - {name: max_absolute_error, type: Float}
+      - {name: mean_absolute_error, type: Float}
+      - {name: mean_squared_error, type: Float}
+      - {name: root_mean_squared_error, type: Float}
+      - {name: metrics, type: JsonObject}
+      implementation:
+        container:
+          image: python:3.12
+          command:
+          - sh
+          - -c
+          - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+            'pandas==2.3.3' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet
+            --no-warn-script-location 'pandas==2.3.3' --user) && "$0" "$@"
+          - sh
+          - -ec
+          - |
+            program_path=$(mktemp)
+            printf "%s" "$0" > "$program_path"
+            python3 -u "$program_path" "$@"
+          - |
+            def calculate_regression_metrics_from_CSV(
+                predictions_path,
+                label_column_name = "label",
+                prediction_column_name = "prediction",
+            ):
+                """Calculates regression metrics.
+
+                Annotations:
+                    author: Alexey Volkov <alexey.volkov@ark-kun.com>
+                """
+                import math
+                import numpy
+
+                import pandas
+
+                df = pandas.read_csv(predictions_path)
+
+                true_values = df[label_column_name]
+                predicted_values = df[prediction_column_name]
+
+                if predicted_values.shape != true_values.shape:
+                    raise ValueError(
+                        "Input shapes are different: {} != {}".format(
+                            predicted_values.shape, true_values.shape
+                        )
+                    )
+
+                number_of_items = true_values.size
+                errors = true_values - predicted_values
+                abs_errors = numpy.abs(errors)
+                squared_errors = errors**2
+                max_absolute_error = numpy.max(abs_errors).item()
+                mean_absolute_error = numpy.average(abs_errors).item()
+                mean_squared_error = numpy.average(squared_errors).item()
+                root_mean_squared_error = math.sqrt(mean_squared_error)
+                metrics = dict(
+                    number_of_items=number_of_items,
+                    max_absolute_error=max_absolute_error,
+                    mean_absolute_error=mean_absolute_error,
+                    mean_squared_error=mean_squared_error,
+                    root_mean_squared_error=root_mean_squared_error,
+                )
+
+                return (
+                    number_of_items,
+                    max_absolute_error,
+                    mean_absolute_error,
+                    mean_squared_error,
+                    root_mean_squared_error,
+                    metrics,
+                )
+
+            def _serialize_float(float_value: float) -> str:
+                if isinstance(float_value, str):
+                    return float_value
+                if not isinstance(float_value, (float, int)):
+                    raise TypeError('Value "{}" has type "{}" instead of float.'.format(str(float_value), str(type(float_value))))
+                return str(float_value)
+
+            def _serialize_int(int_value: int) -> str:
+                if isinstance(int_value, str):
+                    return int_value
+                if not isinstance(int_value, int):
+                    raise TypeError('Value "{}" has type "{}" instead of int.'.format(str(int_value), str(type(int_value))))
+                return str(int_value)
+
+            def _serialize_json(obj) -> str:
+                if isinstance(obj, str):
+                    return obj
+                import json
+                def default_serializer(obj):
+                    if hasattr(obj, 'to_struct'):
+                        return obj.to_struct()
+                    else:
+                        raise TypeError("Object of type '%s' is not JSON serializable and does not have .to_struct() method." % obj.__class__.__name__)
+                return json.dumps(obj, default=default_serializer, sort_keys=True)
+
+            import argparse
+            _parser = argparse.ArgumentParser(prog='Calculate regression metrics from CSV', description='Calculates regression metrics.')
+            _parser.add_argument("--predictions", dest="predictions_path", type=str, required=True, default=argparse.SUPPRESS)
+            _parser.add_argument("--label-column-name", dest="label_column_name", type=str, required=False, default=argparse.SUPPRESS)
+            _parser.add_argument("--prediction-column-name", dest="prediction_column_name", type=str, required=False, default=argparse.SUPPRESS)
+            _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=6)
+            _parsed_args = vars(_parser.parse_args())
+            _output_files = _parsed_args.pop("_output_paths", [])
+
+            _outputs = calculate_regression_metrics_from_CSV(**_parsed_args)
+
+            _output_serializers = [
+                _serialize_int,
+                _serialize_float,
+                _serialize_float,
+                _serialize_float,
+                _serialize_float,
+                _serialize_json,
+
+            ]
+
+            import os
+            for idx, output_file in enumerate(_output_files):
+                try:
+                    os.makedirs(os.path.dirname(output_file))
+                except OSError:
+                    pass
+                with open(output_file, "w") as f:
+                    f.write(_output_serializers[idx](_outputs[idx]))
+          args:
+          - --predictions
+          - {inputPath: predictions}
+          - if:
+              cond: {isPresent: label_column_name}
+              then:
+              - --label-column-name
+              - {inputValue: label_column_name}
+          - if:
+              cond: {isPresent: prediction_column_name}
+              then:
+              - --prediction-column-name
+              - {inputValue: prediction_column_name}
+          - '----output-paths'
+          - {outputPath: number_of_items}
+          - {outputPath: max_absolute_error}
+          - {outputPath: mean_absolute_error}
+          - {outputPath: mean_squared_error}
+          - {outputPath: root_mean_squared_error}
+          - {outputPath: metrics}
+  - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/89d9d83d77cdbbe521994f5d95893661e14f9172/components/ml_metrics/Calculate_regression_metrics/from_ApacheParquet/component.yaml
+    digest: 2c46f26adb27c8bf4325304f11b9eb9d17b8b9d7c527683bfb38a2b70a6cbdd9
+    text: |
+      name: Calculate regression metrics from ApacheParquet
+      description: Calculates regression metrics.
+      metadata:
+        annotations: {author: Alexey Volkov <alexey.volkov@ark-kun.com>, canonical_location: 'https://raw.githubusercontent.com/Ark-kun/pipeline_components/master/components/ml_metrics/Calculate_regression_metrics/from_ApacheParquet/component.yaml',
+          python_dependencies_time: '2025-11-30'}
+      inputs:
+      - {name: predictions, type: ApacheParquet}
+      - {name: label_column_name, type: String, default: label, optional: true}
+      - {name: prediction_column_name, type: String, default: prediction, optional: true}
+      outputs:
+      - {name: number_of_items, type: Integer}
+      - {name: max_absolute_error, type: Float}
+      - {name: mean_absolute_error, type: Float}
+      - {name: mean_squared_error, type: Float}
+      - {name: root_mean_squared_error, type: Float}
+      - {name: metrics, type: JsonObject}
+      implementation:
+        container:
+          image: python:3.12
+          command:
+          - sh
+          - -c
+          - (PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet --no-warn-script-location
+            'pandas==2.3.3' 'pyarrow==22.0.0' || PIP_DISABLE_PIP_VERSION_CHECK=1 python3
+            -m pip install --quiet --no-warn-script-location 'pandas==2.3.3' 'pyarrow==22.0.0'
+            --user) && "$0" "$@"
+          - sh
+          - -ec
+          - |
+            program_path=$(mktemp)
+            printf "%s" "$0" > "$program_path"
+            python3 -u "$program_path" "$@"
+          - |
+            def calculate_regression_metrics_from_ApacheParquet(
+                predictions_path,
+                label_column_name = "label",
+                prediction_column_name = "prediction",
+            ):
+                """Calculates regression metrics.
+
+                Annotations:
+                    author: Alexey Volkov <alexey.volkov@ark-kun.com>
+                """
+                import math
+                import numpy
+
+                import pandas
+
+                df = pandas.read_parquet(predictions_path)
+
+                true_values = df[label_column_name]
+                predicted_values = df[prediction_column_name]
+
+                if predicted_values.shape != true_values.shape:
+                    raise ValueError(
+                        "Input shapes are different: {} != {}".format(
+                            predicted_values.shape, true_values.shape
+                        )
+                    )
+
+                number_of_items = true_values.size
+                errors = true_values - predicted_values
+                abs_errors = numpy.abs(errors)
+                squared_errors = errors**2
+                max_absolute_error = numpy.max(abs_errors).item()
+                mean_absolute_error = numpy.average(abs_errors).item()
+                mean_squared_error = numpy.average(squared_errors).item()
+                root_mean_squared_error = math.sqrt(mean_squared_error)
+                metrics = dict(
+                    number_of_items=number_of_items,
+                    max_absolute_error=max_absolute_error,
+                    mean_absolute_error=mean_absolute_error,
+                    mean_squared_error=mean_squared_error,
+                    root_mean_squared_error=root_mean_squared_error,
+                )
+
+                return (
+                    number_of_items,
+                    max_absolute_error,
+                    mean_absolute_error,
+                    mean_squared_error,
+                    root_mean_squared_error,
+                    metrics,
+                )
+
+            def _serialize_float(float_value: float) -> str:
+                if isinstance(float_value, str):
+                    return float_value
+                if not isinstance(float_value, (float, int)):
+                    raise TypeError('Value "{}" has type "{}" instead of float.'.format(str(float_value), str(type(float_value))))
+                return str(float_value)
+
+            def _serialize_int(int_value: int) -> str:
+                if isinstance(int_value, str):
+                    return int_value
+                if not isinstance(int_value, int):
+                    raise TypeError('Value "{}" has type "{}" instead of int.'.format(str(int_value), str(type(int_value))))
+                return str(int_value)
+
+            def _serialize_json(obj) -> str:
+                if isinstance(obj, str):
+                    return obj
+                import json
+                def default_serializer(obj):
+                    if hasattr(obj, 'to_struct'):
+                        return obj.to_struct()
+                    else:
+                        raise TypeError("Object of type '%s' is not JSON serializable and does not have .to_struct() method." % obj.__class__.__name__)
+                return json.dumps(obj, default=default_serializer, sort_keys=True)
+
+            import argparse
+            _parser = argparse.ArgumentParser(prog='Calculate regression metrics from ApacheParquet', description='Calculates regression metrics.')
+            _parser.add_argument("--predictions", dest="predictions_path", type=str, required=True, default=argparse.SUPPRESS)
+            _parser.add_argument("--label-column-name", dest="label_column_name", type=str, required=False, default=argparse.SUPPRESS)
+            _parser.add_argument("--prediction-column-name", dest="prediction_column_name", type=str, required=False, default=argparse.SUPPRESS)
+            _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=6)
+            _parsed_args = vars(_parser.parse_args())
+            _output_files = _parsed_args.pop("_output_paths", [])
+
+            _outputs = calculate_regression_metrics_from_ApacheParquet(**_parsed_args)
+
+            _output_serializers = [
+                _serialize_int,
+                _serialize_float,
+                _serialize_float,
+                _serialize_float,
+                _serialize_float,
+                _serialize_json,
+
+            ]
+
+            import os
+            for idx, output_file in enumerate(_output_files):
+                try:
+                    os.makedirs(os.path.dirname(output_file))
+                except OSError:
+                    pass
+                with open(output_file, "w") as f:
+                    f.write(_output_serializers[idx](_outputs[idx]))
+          args:
+          - --predictions
+          - {inputPath: predictions}
+          - if:
+              cond: {isPresent: label_column_name}
+              then:
+              - --label-column-name
+              - {inputValue: label_column_name}
+          - if:
+              cond: {isPresent: prediction_column_name}
+              then:
+              - --prediction-column-name
+              - {inputValue: prediction_column_name}
+          - '----output-paths'
+          - {outputPath: number_of_items}
+          - {outputPath: max_absolute_error}
+          - {outputPath: mean_absolute_error}
+          - {outputPath: mean_squared_error}
+          - {outputPath: root_mean_squared_error}
+          - {outputPath: metrics}
+  - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/d8c4cf5e6403bc65bcf8d606e6baf87e2528a3dc/components/ml_metrics/Aggregate_regression_metrics/component.yaml
+    digest: 1291e9c03fab7205acb9bb6b7b41920eed3b07ff3270f1dd57173e421d21f12e
+    text: |
+      name: Aggregate regression metrics
+      description: |-
+        Calculates regression metrics.
+
+            Annotations:
+                author: Alexey Volkov <alexey.volkov@ark-kun.com>
+      inputs:
+      - {name: metrics_1, type: JsonObject}
+      - {name: metrics_2, type: JsonObject, optional: true}
+      - {name: metrics_3, type: JsonObject, optional: true}
+      - {name: metrics_4, type: JsonObject, optional: true}
+      - {name: metrics_5, type: JsonObject, optional: true}
+      outputs:
+      - {name: number_of_items, type: Integer}
+      - {name: max_absolute_error, type: Float}
+      - {name: mean_absolute_error, type: Float}
+      - {name: mean_squared_error, type: Float}
+      - {name: root_mean_squared_error, type: Float}
+      - {name: metrics, type: JsonObject}
+      metadata:
+        annotations:
+          author: Alexey Volkov <alexey.volkov@ark-kun.com>
+          canonical_location: 'https://raw.githubusercontent.com/Ark-kun/pipeline_components/master/components/ml_metrics/Aggregate_regression_metrics/component.yaml'
+      implementation:
+        container:
+          image: python:3.7
+          command:
+          - python3
+          - -u
+          - -c
+          - |
+            def aggregate_regression_metrics(
+                metrics_1,
+                metrics_2 = None,
+                metrics_3 = None,
+                metrics_4 = None,
+                metrics_5 = None,
+            ):
+                '''Calculates regression metrics.
+
+                Annotations:
+                    author: Alexey Volkov <alexey.volkov@ark-kun.com>
+                '''
+                import math
+
+                metrics_dicts = [d for d in [metrics_1, metrics_2, metrics_3, metrics_4, metrics_5] if d is not None]
+                number_of_items = sum(metrics['number_of_items'] for metrics in metrics_dicts)
+                max_absolute_error = max(metrics['max_absolute_error'] for metrics in metrics_dicts)
+                mean_absolute_error = sum(metrics['mean_absolute_error'] * metrics['number_of_items'] for metrics in metrics_dicts) / number_of_items
+                mean_squared_error = sum(metrics['mean_squared_error'] * metrics['number_of_items'] for metrics in metrics_dicts) / number_of_items
+                root_mean_squared_error = math.sqrt(mean_squared_error)
+                metrics = dict(
+                    number_of_items=number_of_items,
+                    max_absolute_error=max_absolute_error,
+                    mean_absolute_error=mean_absolute_error,
+                    mean_squared_error=mean_squared_error,
+                    root_mean_squared_error=root_mean_squared_error,
+                )
+
+                return (
+                    number_of_items,
+                    max_absolute_error,
+                    mean_absolute_error,
+                    mean_squared_error,
+                    root_mean_squared_error,
+                    metrics,
+                )
+
+            def _serialize_json(obj) -> str:
+                if isinstance(obj, str):
+                    return obj
+                import json
+                def default_serializer(obj):
+                    if hasattr(obj, 'to_struct'):
+                        return obj.to_struct()
+                    else:
+                        raise TypeError("Object of type '%s' is not JSON serializable and does not have .to_struct() method." % obj.__class__.__name__)
+                return json.dumps(obj, default=default_serializer, sort_keys=True)
+
+            def _serialize_float(float_value: float) -> str:
+                if isinstance(float_value, str):
+                    return float_value
+                if not isinstance(float_value, (float, int)):
+                    raise TypeError('Value "{}" has type "{}" instead of float.'.format(str(float_value), str(type(float_value))))
+                return str(float_value)
+
+            def _serialize_int(int_value: int) -> str:
+                if isinstance(int_value, str):
+                    return int_value
+                if not isinstance(int_value, int):
+                    raise TypeError('Value "{}" has type "{}" instead of int.'.format(str(int_value), str(type(int_value))))
+                return str(int_value)
+
+            import json
+            import argparse
+            _parser = argparse.ArgumentParser(prog='Aggregate regression metrics', description='Calculates regression metrics.\n\n    Annotations:\n        author: Alexey Volkov <alexey.volkov@ark-kun.com>')
+            _parser.add_argument("--metrics-1", dest="metrics_1", type=json.loads, required=True, default=argparse.SUPPRESS)
+            _parser.add_argument("--metrics-2", dest="metrics_2", type=json.loads, required=False, default=argparse.SUPPRESS)
+            _parser.add_argument("--metrics-3", dest="metrics_3", type=json.loads, required=False, default=argparse.SUPPRESS)
+            _parser.add_argument("--metrics-4", dest="metrics_4", type=json.loads, required=False, default=argparse.SUPPRESS)
+            _parser.add_argument("--metrics-5", dest="metrics_5", type=json.loads, required=False, default=argparse.SUPPRESS)
+            _parser.add_argument("----output-paths", dest="_output_paths", type=str, nargs=6)
+            _parsed_args = vars(_parser.parse_args())
+            _output_files = _parsed_args.pop("_output_paths", [])
+
+            _outputs = aggregate_regression_metrics(**_parsed_args)
+
+            _output_serializers = [
+                _serialize_int,
+                _serialize_float,
+                _serialize_float,
+                _serialize_float,
+                _serialize_float,
+                _serialize_json,
+
+            ]
+
+            import os
+            for idx, output_file in enumerate(_output_files):
+                try:
+                    os.makedirs(os.path.dirname(output_file))
+                except OSError:
+                    pass
+                with open(output_file, 'w') as f:
+                    f.write(_output_serializers[idx](_outputs[idx]))
+          args:
+          - --metrics-1
+          - {inputValue: metrics_1}
+          - if:
+              cond: {isPresent: metrics_2}
+              then:
+              - --metrics-2
+              - {inputValue: metrics_2}
+          - if:
+              cond: {isPresent: metrics_3}
+              then:
+              - --metrics-3
+              - {inputValue: metrics_3}
+          - if:
+              cond: {isPresent: metrics_4}
+              then:
+              - --metrics-4
+              - {inputValue: metrics_4}
+          - if:
+              cond: {isPresent: metrics_5}
+              then:
+              - --metrics-5
+              - {inputValue: metrics_5}
+          - '----output-paths'
+          - {outputPath: number_of_items}
+          - {outputPath: max_absolute_error}
+          - {outputPath: mean_absolute_error}
+          - {outputPath: mean_squared_error}
+          - {outputPath: root_mean_squared_error}
+          - {outputPath: metrics}
 - name: Converters
   components:
   - url: https://raw.githubusercontent.com/Ark-kun/pipeline_components/d8c4cf5e6403bc65bcf8d606e6baf87e2528a3dc/components/_converters/ApacheParquet/from_CSV/component.yaml

@@ -74,22 +74,26 @@ folders:
       - name: "XGBoost"
         components:
           - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/96a177dd71d54c98573c4101d9a05ac801f1fa54/components/XGBoost/Train/component.yaml"
-          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/96a177dd71d54c98573c4101d9a05ac801f1fa54/components/XGBoost/Predict/component.yaml"
+          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/79d79efc5619692b28bcf14d37718077330ad617/components/XGBoost/Predict/component.yaml"
           - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/96a177dd71d54c98573c4101d9a05ac801f1fa54/components/XGBoost/Train/from_ApacheParquet/component.yaml"
-          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/96a177dd71d54c98573c4101d9a05ac801f1fa54/components/XGBoost/Predict/from_ApacheParquet/component.yaml"
+          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/79d79efc5619692b28bcf14d37718077330ad617/components/XGBoost/Predict/from_ApacheParquet/component.yaml"
 
       - name: "PyTorch"
         components:
-          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/d8c4cf5e6403bc65bcf8d606e6baf87e2528a3dc/components/PyTorch/Create_fully_connected_network/component.yaml"
+          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/92aa941c738e5b2fe957f987925053bf70996264/components/PyTorch/Create_fully_connected_network/component.yaml"
           - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/96a177dd71d54c98573c4101d9a05ac801f1fa54/components/PyTorch/Train_PyTorch_model/from_CSV/component.yaml"
+          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/7799eb6ae4c4bb817f7461e2e3ffc83cbe2d50a7/components/PyTorch/Predict/on_CSV/component.yaml"
+          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/d2b5b635198ce661c9c58e3a1817c4c018e7c40b/components/PyTorch/Train_PyTorch_model/from_ApacheParquet/component.yaml"
+          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/7799eb6ae4c4bb817f7461e2e3ffc83cbe2d50a7/components/PyTorch/Predict/on_ApacheParquet/component.yaml"
           - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/d8c4cf5e6403bc65bcf8d606e6baf87e2528a3dc/components/PyTorch/Convert_to_OnnxModel_from_PyTorchScriptModule/component.yaml"
           - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/46d51383e6554b7f3ab4fd8cf614d8c2b422fb22/components/PyTorch/Create_PyTorch_Model_Archive/with_base_handler/component.yaml"
 
       - name: "Tensorflow"
         components:
-          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/f3a9769d35a057c31a498e0667cae2e4a830c5b0/components/tensorflow/Create_fully_connected_network/component.yaml"
-          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/c504a4010348c50eaaf6d4337586ccc008f4dcef/components/tensorflow/Train_model_using_Keras/on_CSV/component.yaml"
+          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/92aa941c738e5b2fe957f987925053bf70996264/components/tensorflow/Create_fully_connected_network/component.yaml"
+          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/92aa941c738e5b2fe957f987925053bf70996264/components/tensorflow/Train_model_using_Keras/on_CSV/component.yaml"
           - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/92aa941c738e5b2fe957f987925053bf70996264/components/tensorflow/Train_model_using_Keras/on_ApacheParquet/component.yaml"
+          - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/92aa941c738e5b2fe957f987925053bf70996264/components/tensorflow/Predict/on_CSV/component.yaml"
           - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/92aa941c738e5b2fe957f987925053bf70996264/components/tensorflow/Predict/on_ApacheParquet/component.yaml"
 
       - name: "CatBoost"
@@ -117,6 +121,11 @@ folders:
       #     - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/d8c4cf5e6403bc65bcf8d606e6baf87e2528a3dc/components/deprecated/tfx/Transform/component.yaml"
       #     - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/d8c4cf5e6403bc65bcf8d606e6baf87e2528a3dc/components/deprecated/tfx/Trainer/component.yaml"
       #     - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/d8c4cf5e6403bc65bcf8d606e6baf87e2528a3dc/components/deprecated/tfx/Evaluator/component.yaml"
+  - name: "ML Metrics"
+    components:
+      - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/9b65c073ae0a131151454c7f9030cb1a553ca7ba/components/ml_metrics/Calculate_regression_metrics/from_CSV/component.yaml"
+      - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/89d9d83d77cdbbe521994f5d95893661e14f9172/components/ml_metrics/Calculate_regression_metrics/from_ApacheParquet/component.yaml"
+      - url: "https://raw.githubusercontent.com/Ark-kun/pipeline_components/d8c4cf5e6403bc65bcf8d606e6baf87e2528a3dc/components/ml_metrics/Aggregate_regression_metrics/component.yaml"
 
   - name: "Converters"
     components:
